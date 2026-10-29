@@ -1,0 +1,75 @@
+name: catproof-community
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: catproof
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run the Community Edition setup first}
+      POSTGRES_DB: catproof
+    volumes:
+      - registry-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U catproof -d catproof"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+  app:
+    image: ${CATPROOF_IMAGE:-ghcr.io/cat-proof/catproof-community:0.1.0}
+    build: .
+    environment:
+      DATABASE_URL: postgresql://catproof:${POSTGRES_PASSWORD:?Run setup first}@db:5432/catproof
+      APP_PASSWORD: ${APP_BOOTSTRAP_PASSWORD:?Run setup first}
+      APP_BOOTSTRAP_LOGIN_ENABLED: "false"
+      APP_ORIGINS: https://localhost:8443
+      APP_PUBLIC_ORIGIN: https://localhost:8443
+      MARKETING_HOSTS: ""
+      PORT: "10000"
+      CATPROOF_LEGACY_CREDENTIAL_PREFIXES: ""
+      CONNECTOR_ENCRYPTION_KEYS: ${CONNECTOR_ENCRYPTION_KEYS:?Run setup first}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:10000/healthz', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 30
+    restart: unless-stopped
+  web:
+    image: caddy:2
+    ports:
+      - "127.0.0.1:8443:443"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - local-tls:/data
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+  test-db:
+    image: postgres:17
+    profiles: [test]
+    environment:
+      POSTGRES_USER: catproof_test
+      POSTGRES_PASSWORD: disposable-test-password
+      POSTGRES_DB: catproof_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U catproof_test -d catproof_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  tests:
+    build: .
+    profiles: [test]
+    environment:
+      TEST_POSTGRES_URL: postgresql://catproof_test:disposable-test-password@test-db:5432/catproof_test
+    depends_on:
+      test-db:
+        condition: service_healthy
+    command: ["python", "-m", "unittest", "-q"]
+volumes:
+  registry-data:
+  local-tls:

@@ -1,0 +1,6 @@
+boto3==1.43.119
+psycopg[binary]==3.2.13
+cryptography==46.0.7
+SQLAlchemy==2.0.44
+alembic==1.17.2
+python-dotenv==1.2.1

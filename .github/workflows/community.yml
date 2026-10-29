@@ -1,0 +1,47 @@
+name: Community checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  docker-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify release files and local initialization
+        run: |
+          python -m unittest -v test_community_setup
+          python scripts/check_release.py
+          python scripts/init_env.py --path .env
+          docker compose config --quiet
+      - name: Run PostgreSQL and HTTP regression tests
+        run: docker compose --profile test run --build --rm tests
+      - name: Check JavaScript
+        run: |
+          node --test test_demo_model.cjs test_graph_model.cjs test_mapping_model.cjs
+          for file in federation_static/*.js demo_static/*.js; do node --check "$file"; done
+      - name: Start the source-built distribution
+        run: ./community.sh start --build
+      - name: Verify HTTPS, accounts, isolation and restart persistence
+        run: |
+          ./community.sh certificate
+          python scripts/smoke_local.py --ca catproof-local-ca.crt --restart
+      - name: Stop test containers
+        if: always()
+        run: docker compose --profile test down
+  powershell:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse the PowerShell launcher
+        shell: pwsh
+        run: |
+          $Errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile("$PWD/community.ps1", [ref]$null, [ref]$Errors)
+          if ($Errors) { $Errors | Format-List; exit 1 }

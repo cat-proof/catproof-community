@@ -1,0 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap');
+:root{color-scheme:dark;--ink:#edf3ea;--muted:#a0adba;--paper:#0b1020;--surface:#101a2b;--line:#263044;--accent:#c1f586;--sage:#172338;font-family:'DM Sans',Arial,sans-serif;color:var(--ink);background:var(--paper)}
+body{background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4,.brand{font-family:Manrope,Arial,sans-serif}h1{font-weight:550}a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:4px}input,textarea,select{color:var(--ink);background:#0d1525;border-color:#40516a}input::placeholder,textarea::placeholder{color:var(--muted)}
+.brand{color:var(--ink);font-size:28px;letter-spacing:-1.5px}.brand svg{width:32px;height:34px;flex:none}.brand span{font-size:inherit;font-weight:750;letter-spacing:inherit}.brand .brand-dot{color:var(--accent)}
+.primary{background:var(--accent);border:1px solid var(--accent);color:#14271b;font:650 13px 'DM Sans',Arial,sans-serif;border-radius:6px}.primary:hover{background:#d2ffa5;border-color:#d2ffa5}button:disabled{opacity:.55}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
