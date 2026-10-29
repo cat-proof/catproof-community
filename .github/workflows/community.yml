@@ -23,7 +23,7 @@ jobs:
         run: |
           python -m unittest -v test_community_setup
           python scripts/check_release.py
-          python scripts/init_env.py --path .env
+          ./community.sh init
           docker compose config --quiet
       - name: Run PostgreSQL and HTTP regression tests
         run: docker compose --profile test run --build --rm tests
