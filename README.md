@@ -2,6 +2,8 @@
 
 A self-hosted system of record for AI agents. Connect authorized inventories, link source identities, assign accountable business owners, and preserve decisions as source metadata changes.
 
+Licensed under [MIT](LICENSE). Third-party dependencies retain their [own licenses](THIRD_PARTY_NOTICES.md).
+
 Run on your laptop with Docker. No CatProof Cloud account or AI model API key is required. Provider connections require your own authorized credentials. The optional browser demo uses fictional records and makes no provider calls.
 
 ## Quick start

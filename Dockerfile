@@ -17,7 +17,9 @@ COPY guides ./guides
 COPY local ./local
 COPY scripts ./scripts
 COPY tests ./tests
+COPY LICENSE THIRD_PARTY_NOTICES.md ./
 LABEL org.opencontainers.image.title="CatProof Community Edition" \
+      org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.source="https://github.com/cat-proof/catproof-community"
 USER catproof
 EXPOSE 10000
