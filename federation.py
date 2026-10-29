@@ -458,9 +458,9 @@ class FederatedRegistry:
             for link in self.db.execute('SELECT asset_id,entity_id FROM catproof_asset_links'):
                 asset_links.setdefault(link['asset_id'],[]).append(link['entity_id'])
             for saved in self.db.execute('SELECT * FROM catproof_assets'):
-                a=json.loads(saved['payload']);a.update(asset_id=saved['id'],connection_id=saved['connection_id'],connection_name=cmap[saved['connection_id']]['name'],connection_enabled=bool(cmap[saved['connection_id']]['enabled']),present=bool(saved['present']),stale=bool(saved['stale']),linked_agents=asset_links.get(saved['id'],[]));assets.append(a)
+                a=json.loads(saved['payload']);a.update(asset_id=saved['id'],connection_id=saved['connection_id'],connection_name=cmap[saved['connection_id']]['name'],connection_enabled=bool(cmap[saved['connection_id']]['enabled']),present=bool(saved['present']),stale=bool(saved['stale']) or not cmap[saved['connection_id']]['within_limit'],linked_agents=asset_links.get(saved['id'],[]));assets.append(a)
             for o in self.db.execute('SELECT o.*,b.entity_id FROM catproof_observations o JOIN catproof_bindings b ON b.observation_id=o.id'):
-                row=json.loads(o['payload']);row.update(observation_id=o['id'],registry_id=o['entity_id'],connection_id=o['connection_id'],connection_name=cmap[o['connection_id']]['name'],connection_enabled=bool(cmap[o['connection_id']]['enabled']),first_seen=o['first_seen'],present=bool(o['present']),stale=bool(o['stale']))
+                row=json.loads(o['payload']);row.update(observation_id=o['id'],registry_id=o['entity_id'],connection_id=o['connection_id'],connection_name=cmap[o['connection_id']]['name'],connection_enabled=bool(cmap[o['connection_id']]['enabled']),first_seen=o['first_seen'],present=bool(o['present']),stale=bool(o['stale']) or not cmap[o['connection_id']]['within_limit'])
                 observations.append(row)
             agents=[]
             for e in self.db.execute('SELECT * FROM catproof_entities WHERE archived=0 ORDER BY created_at,id'):

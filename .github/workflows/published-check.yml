@@ -39,6 +39,7 @@ jobs:
         run: |
           ./community.sh certificate
           python3 scripts/smoke_local.py --ca catproof-local-ca.crt --restart
+          if test -f scripts/smoke_community_limit.py; then python3 scripts/smoke_community_limit.py --ca catproof-local-ca.crt; fi
           docker image inspect "$CATPROOF_IMAGE" --format '{{json .RepoDigests}}'
       - name: Stop test containers
         if: always()

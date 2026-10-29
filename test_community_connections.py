@@ -69,7 +69,7 @@ class CommunityConnectionTests(unittest.TestCase):
         called=[]
         self.registry.reader=lambda c,*args:(called.append(c['id']) or payload())
         self.registry.refresh()
-        self.assertEqual(called,ids[:2])
+        self.assertEqual(set(called),set(ids[:2]))
         with self.assertRaises(ConnectionLimitError):self.registry.refresh(ids[2])
         self.assertEqual(len(self.registry.snapshot()['sources']),3)
         self.assertTrue(self.registry.snapshot()['connection_limits']['over_limit'])

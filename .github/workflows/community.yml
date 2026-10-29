@@ -37,6 +37,7 @@ jobs:
         run: |
           ./community.sh certificate
           python scripts/smoke_local.py --ca catproof-local-ca.crt --restart
+          if test -f scripts/smoke_community_limit.py; then python3 scripts/smoke_community_limit.py --ca catproof-local-ca.crt; fi
       - name: Stop test containers
         if: always()
         run: docker compose --profile test down
