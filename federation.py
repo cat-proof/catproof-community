@@ -162,7 +162,7 @@ class FederatedRegistry:
 
     def require_connection_available(self,cid):
         row=self.db.execute('SELECT archived FROM catproof_connections WHERE id=?',(cid,)).fetchone()
-        if not row:raise KeyError('Connection not found')
+        if not row:raise ValueError('Connection not found')
         if row['archived']:raise ValueError('Restore this archived connection before using it.')
         if cid not in self.available_connection_ids():raise ConnectionLimitError(self.connection_limit)
 

@@ -59,6 +59,8 @@ class ScopeTests(unittest.TestCase):
             self.assertEqual(len(set(ids)),2)
             with self.store.request(False,self.a['workspace_id']) as store:
                 self.assertTrue(all(store.credentials[cid] for cid in ids))
+            with self.store.request(True,self.a['workspace_id']) as store:
+                for cid in ids:store.set_archived(cid,True)
 
 class SchedulingTests(unittest.TestCase):
     setUp=sync_fixtures.HostedSyncTests.setUp
@@ -67,6 +69,8 @@ class SchedulingTests(unittest.TestCase):
     join=sync_fixtures.HostedSyncTests.join
     authorize=sync_fixtures.HostedSyncTests.authorize
     def test_deferred_sources_are_untouched_and_run_first_next_time(self):
+        # Exercise scheduler fairness independently of Community's two-slot policy.
+        self.store.connection_limit=None
         with self.store.request(True,self.a['workspace_id']) as store:
             ids=[store.add_connection({'name':str(i),'kind':'discovery','url':f'https://source{i}.invalid'}) for i in range(3)]
         clock=[0];called=[]

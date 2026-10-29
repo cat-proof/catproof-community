@@ -68,13 +68,14 @@ class CommunityConnectionTests(unittest.TestCase):
         finally:old.db.close()
         called=[]
         self.registry.reader=lambda c,*args:(called.append(c['id']) or payload())
+        available=self.registry.available_connection_ids();blocked=next(cid for cid in ids if cid not in available)
         self.registry.refresh()
-        self.assertEqual(set(called),set(ids[:2]))
-        with self.assertRaises(ConnectionLimitError):self.registry.refresh(ids[2])
+        self.assertEqual(set(called),set(available))
+        with self.assertRaises(ConnectionLimitError):self.registry.refresh(blocked)
         self.assertEqual(len(self.registry.snapshot()['sources']),3)
         self.assertTrue(self.registry.snapshot()['connection_limits']['over_limit'])
-        self.registry.set_archived(ids[0],True)
-        called.clear();self.registry.refresh(ids[2]);self.assertEqual(called,[ids[2]])
+        self.registry.set_archived(available[0],True)
+        called.clear();self.registry.refresh(blocked);self.assertEqual(called,[blocked])
 
     def test_count_is_serialized_across_database_connections(self):
         self.registry.add_connection(connection('first'))
@@ -142,10 +143,13 @@ class CommunityConnectionHTTPTests(unittest.TestCase):
         old=FederatedRegistry(self.url if hasattr(self,'url') else self.path,connect=self.connect,env={},workspace_id=self.a['workspace_id'],connection_limit=None)
         try:third=old.add_connection(connection('legacy-third'))
         finally:old.db.close()
+        with self.store.request(False,self.a['workspace_id']) as registry:
+            available=set(registry.available_connection_ids())
+            blocked=next(s['id'] for s in registry.snapshot()['sources'] if s['id'] not in available)
         from unittest.mock import patch
         with patch('sync_worker.fetch_snapshot',side_effect=AssertionError('Must not contact a third source')) as fetch:
-            self.assertEqual(self.request('/api/connection-preview',{'connection_id':third})[0],409)
-            self.assertEqual(self.request('/api/refresh',{'connection_id':third})[0],409)
+            self.assertEqual(self.request('/api/connection-preview',{'connection_id':blocked})[0],409)
+            self.assertEqual(self.request('/api/refresh',{'connection_id':blocked})[0],409)
             fetch.assert_not_called()
 
 

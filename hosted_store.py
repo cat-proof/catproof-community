@@ -6,7 +6,7 @@ share the same relational database and commit boundary.
 from contextlib import contextmanager
 import os
 import re
-from federation import FederatedRegistry
+from federation import FederatedRegistry, COMMUNITY_CONNECTION_LIMIT
 from registry_locks import lock_registry
 
 
@@ -24,12 +24,12 @@ def credential_environment(workspace_id):
     return {k: v for k, v in os.environ.items() if k in allowed}
 
 class HostedStore:
-    def __init__(self, database_url, connect=None):
+    def __init__(self, database_url, connect=None, connection_limit=COMMUNITY_CONNECTION_LIMIT):
         if connect is None:
             import psycopg
             connect=psycopg.connect
-        self.connect=connect;self.url=database_url
-        self.store=FederatedRegistry(self.url,connect=self.connect,env={})
+        self.connect=connect;self.url=database_url;self.connection_limit=connection_limit
+        self.store=FederatedRegistry(self.url,connect=self.connect,env={},connection_limit=connection_limit)
         from database import require_hosted_schema
         with self.connect(self.url,connect_timeout=5) as db:require_hosted_schema(db)
         with self.request():pass
@@ -41,7 +41,7 @@ class HostedStore:
             else:db.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
             if not db.execute('SELECT 1 FROM catproof_workspaces WHERE id=%s',(workspace_id,)).fetchone():
                 raise RuntimeError('Registry is unavailable')
-            registry=FederatedRegistry(env=credential_environment(workspace_id),workspace_id=workspace_id,db=db)
+            registry=FederatedRegistry(env=credential_environment(workspace_id),workspace_id=workspace_id,db=db,connection_limit=self.connection_limit)
             registry.credentials=self.credentials.load(db,workspace_id) if hasattr(self,'credentials') else {}
             try:yield registry
             finally:registry.credentials={}
