@@ -124,6 +124,7 @@ class SecretTests(unittest.TestCase):
                     for value in expected.values():self.assertNotIn(value,cipher)
                 self.secrets.change(self.a,{'connection_id':cid},remove=True)
                 with self.store.request(False,self.a['workspace_id']) as store:self.assertFalse(next(s for s in store.snapshot()['sources'] if s['id']==cid)['enabled'])
+                with self.store.request(True,self.a['workspace_id']) as store:store.set_archived(cid,True)
     def test_basic_password_is_opaque_and_switch_clears_previous_auth(self):
         cid=self.connect_provider('servicenow',{'mode':'basic','username':'fixture-reader','password':' secret with spaces '})
         with self.store.request(False,self.a['workspace_id']) as store:

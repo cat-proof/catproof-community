@@ -71,7 +71,7 @@ This also generates local configuration on first use and preserves it on reruns.
 ### Pull the published image instead
 
 ```sh
-docker pull ghcr.io/cat-proof/catproof-community:0.1.0
+docker pull ghcr.io/cat-proof/catproof-community:0.2.0
 ```
 
 Pulling downloads the application image only. Use `./community.sh start` or `.\community.ps1 start` to configure and run the complete stack with the published image.
@@ -105,6 +105,14 @@ Use `curl.exe` for that command in Windows PowerShell. The expected response is 
 Open https://localhost:8443/signup. Create a personal account, name your registry and add your first agent. These credentials belong to your local installation. A CatProof Cloud login is not needed. Automatic outbound email is not configured in the bundle, so keep account credentials safe.
 
 Preview the fictional demo at https://localhost:8443/demo. Demo records are separate from your real registry. Source discovery requires an authorized connection configured in the app; see the included `guides/` directory and [published connector scopes](https://catproof.ai/connectors/).
+
+## Manage connection slots
+
+Community Edition allows two saved, unarchived source connections per registry. Every connector type uses the same quota, including peer and discovery connections. Pausing does not free a slot. Agent records, CSV imports and the separate fictional browser demo do not use source slots.
+
+In Connected registries, an owner can choose **Archive connection** and confirm. The connection stops refreshing, its observations become stale, and its records and history remain. Archive frees a slot. **Restore connection** requires a free slot and leaves the source paused until you enable it.
+
+If an older installation has more than two unarchived connections, only the two oldest may preview or refresh. Archive unwanted connections to choose the two you want to use.
 
 ## Stop or inspect
 

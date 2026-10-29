@@ -48,6 +48,7 @@ class ConnectorSecrets:
                 connection=store.db.execute('SELECT kind FROM catproof_connections WHERE id=?',(cid,)).fetchone()
                 if not connection or not auth_spec(connection[0])['modes']:raise ValueError('Connection not found')
                 kind=connection[0]
+                if not remove:store.require_connection_available(cid)
                 if remove:
                     store.set_enabled(cid,False)
                     db.execute("INSERT INTO catproof_connector_secrets(registry_id,connection_id,ciphertext,updated_at) VALUES(%s,%s,'',%s) ON CONFLICT(registry_id,connection_id) DO UPDATE SET ciphertext='',updated_at=excluded.updated_at",(registry,cid,time.time()))

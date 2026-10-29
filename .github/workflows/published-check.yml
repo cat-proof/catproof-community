@@ -1,5 +1,12 @@
 name: Published image runtime check
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published image version
+        required: true
+        default: '0.2.0'
+        type: string
 permissions:
   contents: read
   packages: read
@@ -12,11 +19,11 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
     env:
-      CATPROOF_IMAGE: ghcr.io/cat-proof/catproof-community:0.1.0
+      CATPROOF_IMAGE: ghcr.io/cat-proof/catproof-community:${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: v0.1.0
+          ref: v${{ inputs.version }}
       - name: Read package visibility
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -32,6 +39,7 @@ jobs:
         run: |
           ./community.sh certificate
           python3 scripts/smoke_local.py --ca catproof-local-ca.crt --restart
+          if test -f scripts/smoke_community_limit.py; then python3 scripts/smoke_community_limit.py --ca catproof-local-ca.crt; fi
           docker image inspect "$CATPROOF_IMAGE" --format '{{json .RepoDigests}}'
       - name: Stop test containers
         if: always()

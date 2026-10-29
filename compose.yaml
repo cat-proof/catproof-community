@@ -15,7 +15,7 @@ services:
       retries: 30
     restart: unless-stopped
   app:
-    image: ${CATPROOF_IMAGE:-ghcr.io/cat-proof/catproof-community:0.1.0}
+    image: ${CATPROOF_IMAGE:-ghcr.io/cat-proof/catproof-community:0.2.0}
     build: .
     environment:
       DATABASE_URL: postgresql://catproof:${POSTGRES_PASSWORD:?Run setup first}@db:5432/catproof
