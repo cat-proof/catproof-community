@@ -22,6 +22,60 @@ cd catproof-community
 
 For PowerShell, run `./community.ps1 start`. Review scripts before running them. No remote shell pipeline is required.
 
+## Build a Docker image from source
+
+Install and start Docker, then clone the source and run the build from the repository root, where `Dockerfile` and `requirements.txt` are located:
+
+```sh
+git clone https://github.com/cat-proof/catproof-community.git
+cd catproof-community
+docker build -t catproof-community:local .
+docker images catproof-community
+```
+
+The final `.` selects the current directory as the build context. This builds and tags the application image only. It does not start CatProof, PostgreSQL or the HTTPS proxy.
+
+To use that image with the complete local stack, initialize the configuration and select the image explicitly:
+
+```sh
+./community.sh init
+CATPROOF_IMAGE=catproof-community:local docker compose up -d --no-build --wait
+```
+
+Windows PowerShell:
+
+```powershell
+.\community.ps1 init
+$env:CATPROOF_IMAGE = 'catproof-community:local'
+docker compose up -d --no-build --wait
+```
+
+After startup, complete the [local HTTPS trust step](#trust-local-https) before browser sign-in. For future Compose operations on this installation, keep selecting the same image with `CATPROOF_IMAGE`. The default launcher pulls the published release image unless you use its source-build option.
+
+### Build and run in one step
+
+The launcher can build the application and start all required services together:
+
+```sh
+./community.sh start --build
+```
+
+On Windows PowerShell:
+
+```powershell
+.\community.ps1 start -Build
+```
+
+This also generates local configuration on first use and preserves it on reruns. No manual `docker build` command is needed for this path.
+
+### Pull the published image instead
+
+```sh
+docker pull ghcr.io/cat-proof/catproof-community:0.1.0
+```
+
+Pulling downloads the application image only. Use `./community.sh start` or `.\community.ps1 start` to configure and run the complete stack with the published image.
+
 ## First start
 
 The launcher creates `.env` once using Python inside an upstream container. It generates a random database password, a disabled-bootstrap password and a connector encryption key. It does not print the values or replace an existing `.env`. Keep that file private and back it up with your database.

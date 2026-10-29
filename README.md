@@ -32,6 +32,8 @@ To build from source instead of pulling the application image:
 
 On PowerShell, use `.\community.ps1 start -Build`.
 
+To create only an application image, run `docker build -t catproof-community:local .` from the repository root. See [Build a Docker image from source](docs/INSTALL.md#build-a-docker-image-from-source) for clone commands, image verification, and running the custom image with PostgreSQL and HTTPS.
+
 ## What is included
 
 - Canonical agent records with purpose, business owner, lifecycle and review notes.
