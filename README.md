@@ -34,6 +34,14 @@ On PowerShell, use `.\community.ps1 start -Build`.
 
 To create only an application image, run `docker build -t catproof-community:local .` from the repository root. See [Build a Docker image from source](docs/INSTALL.md#build-a-docker-image-from-source) for clone commands, image verification, and running the custom image with PostgreSQL and HTTPS.
 
+## Community Edition connection limit
+
+Community Edition supports **two saved, unarchived source connections per registry**, across all connector types. Paused connections count. Manual records and CSV import/export do not use connection slots. The separate fictional browser demo does not consume slots.
+
+Owners can archive a connection to free a slot without deleting its agent records, source evidence, credentials or history. Archived sources cannot preview or sync. Restoring a source requires a free slot and leaves it paused.
+
+When upgrading an older registry with more than two saved connections, all data remains available. Only the two oldest unarchived connections may read sources. Archive unwanted connections to choose the two you want to use. This is a default product limit in the shipped build, not an anti-tampering or paid-license system.
+
 ## What is included
 
 - Canonical agent records with purpose, business owner, lifecycle and review notes.

@@ -13,7 +13,7 @@ from registry_locks import lock_registry
 
 ROLES=('owner','editor','viewer')
 EDIT_ACTIONS={'/api/reconcile','/api/agents','/api/agents/import','/api/agents/assign-owner','/api/connection-preview','/api/annotate','/api/asset-link','/api/link','/api/unlink','/api/refresh','/api/connection-check'}
-OWNER_ACTIONS={'/api/connections','/api/connection-state'}
+OWNER_ACTIONS={'/api/connections','/api/connection-state','/api/connection-archive'}
 def can_write(role,path):return role=='owner' and path in EDIT_ACTIONS|OWNER_ACTIONS or role=='editor' and path in EDIT_ACTIONS
 
 def digest(value):return hashlib.sha256(value.encode()).hexdigest()

@@ -1,5 +1,12 @@
 name: Anonymous release image smoke check
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published image version
+        required: true
+        default: '0.2.0'
+        type: string
 permissions:
   contents: read
 jobs:
@@ -7,11 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      CATPROOF_IMAGE: ghcr.io/cat-proof/catproof-community:0.1.0
+      CATPROOF_IMAGE: ghcr.io/cat-proof/catproof-community:${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: v0.1.0
+          ref: v${{ inputs.version }}
       - name: Use a clean Docker authentication directory
         run: |
           mkdir -p "$RUNNER_TEMP/anonymous-docker"

@@ -21,7 +21,7 @@ from account_recovery import AccountRecovery
 from reset_email import ResendMailer,PasswordResetEmail
 from connector_secrets import ConnectorSecrets
 from website_leads import WebsiteLeads,validate_lead
-from federation import DuplicateConnection
+from federation import DuplicateConnection,ConnectionLimitError,connection_limit_response
 from marketing import ASSETS,PAGES,STATIC as BRAND_STATIC,asset,public_page,discovery_file
 
 ACCOUNT_STATIC=Path(__file__).parent/'account_static'
@@ -147,7 +147,7 @@ class HostedHandler(FederationHandler):
             except Exception:return self.reply(503,{'error':'Security settings are temporarily unavailable.'})
         if self.path=='/api/me':
             prefix='CATPROOF_'+self.principal['workspace_id'].upper()+'_'
-            return self.reply(200,dict(self.principal,credential_namespace=prefix if self.principal['workspace_id']!='legacy' and self.principal.get('role')=='owner' else '',plan='Early access'))
+            return self.reply(200,dict(self.principal,credential_namespace=prefix if self.principal['workspace_id']!='legacy' and self.principal.get('role')=='owner' else '',plan='Community Edition · 2 saved connections per registry'))
         self.run_registry(False,super().do_GET)
     def form(self):
         length=int(self.headers.get('Content-Length','0'))
@@ -255,6 +255,7 @@ class HostedHandler(FederationHandler):
                 if not 0<length<=40000:raise ValueError()
                 data=json.loads(self.rfile.read(length))
                 try:result=self.server.credentials.change(self.principal,data,connect=self.path.endswith(('connect','connect-lovable')),remove=self.path.endswith('remove'))
+                except ConnectionLimitError as exc:return self.reply(409,connection_limit_response(exc))
                 except DuplicateConnection as exc:return self.reply(409,{'error':str(exc),'connection_id':exc.connection_id})
                 except ValueError as exc:return self.reply(400,{'error':str(exc)})
                 return self.reply(200,result)
@@ -321,6 +322,7 @@ class HostedHandler(FederationHandler):
             else:
                 result=self.server.persistence.refresh(self.principal['workspace_id'],data.get('connection_id'),self.authorize_refresh)
             return self.reply(200,result)
+        except ConnectionLimitError as exc:return self.reply(409,connection_limit_response(exc))
         except PermissionError as exc:return self.reply(403,{'error':str(exc)})
         except (ValueError,TypeError):return self.reply(400,{'error':'Connection is missing, paused, changed during the read, or returned invalid records. Check setup and try again.'})
         except Exception:return self.reply(503,{'error':'Source read failed. Check credentials, permissions and scope, then retry. Previous inventory is retained.'})

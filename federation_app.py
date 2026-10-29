@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from http.server import ThreadingHTTPServer
 from product_app import ProductHandler
-from federation import FederatedRegistry,DuplicateConnection
+from federation import ConnectionLimitError,connection_limit_response,FederatedRegistry,DuplicateConnection
 from adapters import CATALOG
 from adapters.catalog import BASE_CATALOG
 from marketing import ASSETS,asset,discovery_file
@@ -81,9 +81,12 @@ class FederationHandler(ProductHandler):
             if self.path=='/api/unlink':return self.reply(200,store.unlink(data['observation_id']))
             if self.path=='/api/connections':
                 cid=store.add_connection(data);return self.reply(201,dict(store.snapshot(),created_connection_id=cid))
+            if self.path=='/api/connection-archive':
+                store.set_archived(data['connection_id'],data['archived']);return self.reply(200,store.snapshot())
             if self.path=='/api/connection-state':
                 store.set_enabled(data['connection_id'],data['enabled']);return self.reply(200,store.snapshot())
             return self.reply(404,{'error':'Not found'})
+        except ConnectionLimitError as exc:return self.reply(409,connection_limit_response(exc))
         except DuplicateConnection as exc:return self.reply(409,{'error':str(exc),'connection_id':exc.connection_id})
         except KeyError:return self.reply(404,{'error':'Agent, connection or required field not found'})
         except (ValueError,TypeError) as exc:return self.reply(400,{'error':str(exc) if isinstance(exc,ValueError) and not isinstance(exc,json.JSONDecodeError) else 'Invalid request'})

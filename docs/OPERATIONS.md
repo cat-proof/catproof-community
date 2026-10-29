@@ -23,6 +23,9 @@ Use an isolated installation with the same application version and preserved enc
 
 ## Upgrade
 
+Version 0.2.0 introduces a two-connection Community Edition limit and the h0008 connection-archive migration. Existing records and source evidence are preserved. When more than two connections exist, only the two oldest unarchived sources may read. Archive unwanted connections in Connected registries to choose which two to retain.
+
+
 Read the target release notes, stop writers, and take a verified backup before changing versions. Edit `CATPROOF_IMAGE` in `.env` to the published version or digest you selected, then run `./community.sh start`. Do not regenerate `.env`. The launcher pulls the selected image; application startup applies migrations. Old and new writers must not overlap. Database migration rollback requires the old database backup and the matching old application version, not just a previous image tag.
 
 For source builds, switch to a published source tag and use `./community.sh start --build`. Preserve `.env` and the existing project volumes.

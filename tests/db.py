@@ -32,6 +32,9 @@ def connection(label):return database(label)[1]()
 def registry(label=None,**kwargs):
     from federation import FederatedRegistry
     url,connect=database(label)
+    # General model regression fixtures exercise arbitrary inventories. Dedicated
+    # Community tests instantiate the production default to verify the cap.
+    kwargs.setdefault('connection_limit',None)
     return FederatedRegistry(url,connect=connect,**kwargs)
 
 def product_store(label,namespace):

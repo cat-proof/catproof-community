@@ -19,6 +19,16 @@ class DuplicateConnection(ValueError):
         super().__init__('This connection is already saved. Open it to check setup and sync; saving a connection does not import projects.')
         self.connection_id=identifier
 
+COMMUNITY_CONNECTION_LIMIT=2
+
+class ConnectionLimitError(ValueError):
+    def __init__(self,maximum=COMMUNITY_CONNECTION_LIMIT):
+        super().__init__(f'Community Edition supports up to {maximum} saved source connections per registry. Paused connections count. Archive a connection to free a slot; its records and history are preserved.')
+        self.maximum=maximum
+
+def connection_limit_response(exc):
+    return {'error':str(exc),'error_code':'community_connection_limit','maximum_connections':exc.maximum}
+
 LIFECYCLES=('draft','active','suspended','retired')
 KINDS=('discovery','atlas','databricks','servicenow','seeded')+tuple(CATALOG)
 TRACKED=('name','owner','status','source_status','kind','description','evidence')
@@ -121,8 +131,9 @@ def discover(connection, env, refresh=False):
     return {'agents':rows,'sources':sources}
 
 class FederatedRegistry:
-    def __init__(self,database_url=None,env=None,reader=discover,local_port=8770,workspace_id='legacy',connect=None,db=None):
+    def __init__(self,database_url=None,env=None,reader=discover,local_port=8770,workspace_id='legacy',connect=None,db=None,connection_limit=COMMUNITY_CONNECTION_LIMIT):
         self.actor=''
+        self.workspace_id=workspace_id;self.connection_limit=connection_limit
         self.env=dict(os.environ if env is None else env);self.reader=reader;self.local_port=local_port
         self.lock=threading.RLock();self.refresh_lock=threading.Lock()
         from postgres_registry import RegistryConnection
@@ -141,6 +152,26 @@ class FederatedRegistry:
     def event(self,kind,name,detail,entity=None,connection=None):
         self.db.execute('INSERT INTO catproof_registry_events(entity_id,connection_id,at,kind,name,detail,actor) VALUES(?,?,?,?,?,?,?)',
                         (entity,connection,now(),kind,name,json.dumps(detail),self.actor))
+
+    def configured_connection_ids(self):
+        return [row['id'] for row in self.db.execute('SELECT id FROM catproof_connections WHERE archived=0 ORDER BY created_at,id')]
+
+    def available_connection_ids(self):
+        ids=self.configured_connection_ids()
+        return ids if self.connection_limit is None else ids[:self.connection_limit]
+
+    def require_connection_available(self,cid):
+        row=self.db.execute('SELECT archived FROM catproof_connections WHERE id=?',(cid,)).fetchone()
+        if not row:raise KeyError('Connection not found')
+        if row['archived']:raise ValueError('Restore this archived connection before using it.')
+        if cid not in self.available_connection_ids():raise ConnectionLimitError(self.connection_limit)
+
+    def reserve_connection_slot(self):
+        # Shared with hosted writes and membership changes, across processes.
+        from registry_locks import lock_registry
+        lock_registry(self.db,self.workspace_id)
+        if self.connection_limit is not None and len(self.configured_connection_ids())>=self.connection_limit:
+            raise ConnectionLimitError(self.connection_limit)
 
     def add_connection(self,data):
         if not isinstance(data,dict) or set(data)-{'name','kind','url','credential_prefix','source_filter','config'}:raise ValueError('Unsupported connection fields')
@@ -161,8 +192,11 @@ class FederatedRegistry:
         if source_filter and kind not in ('atlas','discovery'):raise ValueError('Source filtering is only supported by registry federation connectors')
         if len(source_filter)>120:raise ValueError('Source filter too long')
         with self.lock,self.db:
+            from registry_locks import lock_registry
+            lock_registry(self.db,self.workspace_id)
             duplicate=self.db.execute('SELECT id FROM catproof_connections WHERE kind=? AND url=? AND source_filter=? AND config=?',(kind,url,source_filter,json.dumps(config,sort_keys=True))).fetchone()
             if duplicate:raise DuplicateConnection(duplicate['id'])
+            self.reserve_connection_slot()
             cid='conn_'+uuid.uuid4().hex[:16]
             self.db.execute('INSERT INTO catproof_connections(id,name,kind,url,credential_prefix,source_filter,created_at,config) VALUES(?,?,?,?,?,?,?,?)',
                             (cid,name,kind,url,prefix,source_filter,now(),json.dumps(config,sort_keys=True)))
@@ -174,11 +208,26 @@ class FederatedRegistry:
         with self.lock,self.db:
             conn=self.db.execute('SELECT * FROM catproof_connections WHERE id=?',(cid,)).fetchone()
             if not conn:raise KeyError('Connection not found')
+            if enabled:self.require_connection_available(cid)
             self.db.execute('UPDATE catproof_connections SET enabled=?,sync_generation=? WHERE id=?',(int(enabled),uuid.uuid4().hex,cid))
             if not enabled:
                 self.db.execute('UPDATE catproof_observations SET stale=1 WHERE connection_id=?',(cid,))
                 self.db.execute('UPDATE catproof_assets SET stale=1 WHERE connection_id=?',(cid,))
             self.event('connection_enabled' if enabled else 'connection_paused',conn['name'],{},connection=cid)
+
+    def set_archived(self,cid,archived):
+        if not isinstance(archived,bool):raise ValueError('Archived must be a boolean')
+        from registry_locks import lock_registry
+        with self.lock,self.db:
+            lock_registry(self.db,self.workspace_id)
+            conn=self.db.execute('SELECT * FROM catproof_connections WHERE id=?',(cid,)).fetchone()
+            if not conn:raise KeyError('Connection not found')
+            if bool(conn['archived'])==archived:return
+            if not archived:self.reserve_connection_slot()
+            self.db.execute('UPDATE catproof_connections SET archived=?,enabled=0,sync_generation=? WHERE id=?',(int(archived),uuid.uuid4().hex,cid))
+            self.db.execute('UPDATE catproof_observations SET stale=1 WHERE connection_id=?',(cid,))
+            self.db.execute('UPDATE catproof_assets SET stale=1 WHERE connection_id=?',(cid,))
+            self.event('connection_archived' if archived else 'connection_restored',conn['name'],{},connection=cid)
 
     def ingest(self,cid,payload):
         if not isinstance(payload,dict) or 'error' in payload or payload.get('errors'):raise ValueError('Invalid or incomplete inventory')
@@ -248,7 +297,10 @@ class FederatedRegistry:
     def refresh(self,cid=None,force=True):
         with self.refresh_lock:
             with self.lock:
+                if cid:self.require_connection_available(cid)
                 conns=[dict(c) for c in self.db.execute('SELECT * FROM catproof_connections WHERE enabled=1'+(' AND id=?' if cid else ''),(cid,) if cid else ())]
+                available=set(self.available_connection_ids())
+                conns=[c for c in conns if c['id'] in available]
             if cid and not conns:raise ValueError('Connection is missing or paused')
             for conn in conns:
                 started=now();error=None;payload=None
@@ -261,6 +313,8 @@ class FederatedRegistry:
         return self.snapshot()
 
     def apply_refresh(self,conn,payload,error,started):
+        with self.lock:
+            if conn['id'] not in self.available_connection_ids():return
         count=0
         if error is None:
             try:
@@ -393,6 +447,11 @@ class FederatedRegistry:
     def snapshot(self):
         with self.lock:
             conns=[dict(c) for c in self.db.execute('SELECT * FROM catproof_connections ORDER BY created_at,id')]
+            configured=self.configured_connection_ids();available=set(self.available_connection_ids())
+            for c in conns:
+                c['within_limit']=c['id'] in available
+                c['configured_enabled']=bool(c['enabled'])
+                c['enabled']=bool(c['enabled']) and c['within_limit']
             for c in conns:c['config']=json.loads(c['config'])
             cmap={c['id']:c for c in conns};observations=[]
             assets=[];asset_links={}
@@ -427,9 +486,9 @@ class FederatedRegistry:
             sources=[]
             for c in conns:
                 records=[o for o in observations if o['connection_id']==c['id']]
-                sources.append(dict(c,credential_storage='encrypted' if getattr(self,'credentials',{}).get(c['id']) else 'operator' if self.has_credentials(c) else 'none',credential_configured=self.has_credentials(c),auth_optional=c['kind'] in OPTIONAL,health='paused' if not c['enabled'] else 'error' if c['error'] else 'ok' if c['last_success'] else 'pending',record_count=sum(o['present'] for o in records),asset_count=sum(a['present'] for a in assets if a['connection_id']==c['id']),coverage=CATALOG.get(c['kind'],{}).get('coverage','Configured source inventory'),verification=CATALOG.get(c['kind'],{}).get('verification','Previously available connector')))
+                sources.append(dict(c,credential_storage='encrypted' if getattr(self,'credentials',{}).get(c['id']) else 'operator' if self.has_credentials(c) else 'none',credential_configured=self.has_credentials(c),auth_optional=c['kind'] in OPTIONAL,health='archived' if c['archived'] else 'limited' if not c['within_limit'] else 'paused' if not c['enabled'] else 'error' if c['error'] else 'ok' if c['last_success'] else 'pending',record_count=sum(o['present'] for o in records),asset_count=sum(a['present'] for a in assets if a['connection_id']==c['id']),coverage=CATALOG.get(c['kind'],{}).get('coverage','Configured source inventory'),verification=CATALOG.get(c['kind'],{}).get('verification','Previously available connector')))
             runs=[dict(r) for r in self.db.execute('SELECT * FROM catproof_sync_runs ORDER BY completed_at DESC,sequence DESC LIMIT 100')]
-            return {'agents':agents,'observations':observations,'assets':assets,'sources':sources,'events':events,'runs':runs,'namespace':'Federated registry',
+            return {'agents':agents,'observations':observations,'assets':assets,'sources':sources,'events':events,'runs':runs,'namespace':'Federated registry','connection_limits':{'edition':'Community Edition','maximum':self.connection_limit,'used':len(configured),'available':None if self.connection_limit is None else max(0,self.connection_limit-len(configured)),'over_limit':self.connection_limit is not None and len(configured)>self.connection_limit},
                     'synced_at':max((c['last_success'] for c in conns if c['last_success']),default=None)}
 
     def link_asset(self,asset_id,entity_id,linked=True):

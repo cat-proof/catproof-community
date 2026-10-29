@@ -56,9 +56,12 @@ class HostedStore:
         deadline = time.monotonic() + 60
         with self.request(False, workspace_id) as registry:
             authorize()
+            if connection_id:registry.require_connection_available(connection_id)
+            available=set(registry.available_connection_ids())
             jobs = [dict(c) for c in registry.db.execute(
                 'SELECT * FROM catproof_connections WHERE enabled=1' + (' AND id=?' if connection_id else ''),
                 (connection_id,) if connection_id else ())]
+            jobs=[job for job in jobs if job['id'] in available]
             jobs.sort(key=lambda job:(job['last_attempt'] or '',job['id']))
             if connection_id and not jobs:
                 raise ValueError('Connection is missing or paused')
@@ -69,6 +72,7 @@ class HostedStore:
                 authorize()
                 current=registry.db.execute('SELECT * FROM catproof_connections WHERE id=?',(job['id'],)).fetchone()
                 if not current or not current['enabled'] or current['sync_generation']!=job['sync_generation']:continue
+                if job['id'] not in registry.available_connection_ids():continue
                 remaining=deadline-time.monotonic()
                 if remaining<=0:break
                 job['last_attempt']=now()
@@ -86,6 +90,7 @@ class HostedStore:
                 current = registry.db.execute('SELECT * FROM catproof_connections WHERE id=?', (job['id'],)).fetchone()
                 if not current or not current['enabled'] or current['sync_generation'] != job['sync_generation']:
                     continue  # A newer sync or pause invalidated this result.
+                if job['id'] not in registry.available_connection_ids():continue
                 registry.actor = actor['email']
                 registry.apply_refresh(job, payload, error, job['last_attempt'])
         with self.request(False, workspace_id) as registry:
@@ -101,6 +106,7 @@ class HostedStore:
             row = registry.db.execute('SELECT * FROM catproof_connections WHERE id=? AND enabled=1', (connection_id,)).fetchone()
             if not row:
                 raise ValueError('Connection is missing or paused')
+            registry.require_connection_available(connection_id)
             job = dict(row)
             environment = registry.credential_env(job)
         payload = (fetch or fetch_snapshot)(job, environment, 30)
@@ -110,6 +116,7 @@ class HostedStore:
             raise ValueError('Inventory exceeds the 10,000 record limit')
         with self.request(False, workspace_id) as registry:
             authorize()
+            registry.require_connection_available(connection_id)
             current = registry.db.execute('SELECT * FROM catproof_connections WHERE id=?', (connection_id,)).fetchone()
             if not current or not current['enabled'] or current['sync_generation'] != job['sync_generation']:
                 raise ValueError('Connection changed during preview. Preview it again.')
