@@ -1,0 +1,30 @@
+name: Anonymous release image smoke check
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  pull-and-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CATPROOF_IMAGE: ghcr.io/cat-proof/catproof-community:0.1.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v0.1.0
+      - name: Use a clean Docker authentication directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/anonymous-docker"
+          echo "DOCKER_CONFIG=$RUNNER_TEMP/anonymous-docker" >> "$GITHUB_ENV"
+      - name: Inspect the public image manifest
+        run: docker buildx imagetools inspect "$CATPROOF_IMAGE"
+      - name: Start from the downloaded release image
+        run: ./community.sh start
+      - name: Verify the pulled application
+        run: |
+          ./community.sh certificate
+          python3 scripts/smoke_local.py --ca catproof-local-ca.crt --restart
+          docker image inspect "$CATPROOF_IMAGE" --format '{{json .RepoDigests}}'
+      - name: Stop test containers
+        if: always()
+        run: docker compose down
