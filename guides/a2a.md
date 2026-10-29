@@ -23,17 +23,18 @@ Open Connector catalog → A2A Agent Card → Configure connector.
 
 The origin must not include paths, query parameters or credentials. Enter the card path in its separate field. Save and Check setup, then Sync this registry. The only upstream operation is an HTTP GET of the card.
 
-## 4. Verify with a local example
+## 4. Verify the connector
 
-The standalone localhost registry can use this fixture without a vendor account. Initialize its PostgreSQL database and launch `federation_app.py` as described in [the federation guide](../FEDERATION.md). The hosted/Compose app blocks private-address provider endpoints; use the isolated integration suite there rather than weakening egress checks:
+Compare a real card's endpoint, name/version and skills with the operating team's expected metadata. Link its identity to a canonical agent only when there is evidence they are the same logical agent.
+
+For local fixture coverage, initialize Community Edition and run the isolated integration suite:
 
 ```sh
-python3 fixture_registry.py --port 8772
+./community.sh init
+docker compose --profile test run --build --rm tests
 ```
 
-Create an A2A connection with origin http://127.0.0.1:8772, the default path and Public endpoint authentication. Sync, then enable Include seeded demo records. Open Demo · A2A policy assistant and inspect its advertised skill and source identity. It remains labeled seeded because the fixture explicitly identifies itself as demo data.
-
-For a real card, compare its advertised endpoint, name/version and skills with the operating team's expected metadata. Link the identity to an existing canonical agent only when you have evidence they are the same logical agent.
+The HTTPS app blocks private-address provider endpoints. Use the isolated integration fixtures rather than weakening that policy to connect a localhost server. Fixture tests do not establish live provider access or runtime health.
 
 ## Troubleshoot
 
